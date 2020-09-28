@@ -27,7 +27,7 @@ public class LivySubmitJob {
 
             client.addJar(new URI("s3a://export-tp-to-parquet/livy.jar"));
             client.addJar(new URI("s3a://export-tp-to-parquet/livyclient.jar"));
-            client.addJar(new URI("s3a://export-tp-to-parquet/txn-to-csv-to-parquet2.jar"));
+            client.addJar(new URI("s3a://export-tp-to-parquet/txn-to-parquet.jar"));
             String response = client.submit(new ExportPgToParquet("A8A127FB-39F8-4BFB-A2C9-BC7E331DA796", "7M0z7UwcSkim5b6uWkaY9A")).get();
             long endTime = System.nanoTime();
             long duration = (endTime - startTime);
