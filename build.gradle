@@ -17,6 +17,9 @@ dependencies {
     compile group: 'org.apache.hadoop', name: 'hadoop-common', version: '2.7.2'
 // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
     compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
-    implementation files('./txn-to-csv-to-parquet2.jar')
+    implementation files('./txn-to-csv-to-parquet-using-livy.jar')
+    compile group: 'com.amazonaws', name: 'aws-java-sdk-emr', version: '1.11.877'
+    compile group: 'org.postgresql', name: 'postgresql', version: '42.2.14'
+
 
 }
