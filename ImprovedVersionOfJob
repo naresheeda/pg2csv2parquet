@@ -1,0 +1,59 @@
+package com.caseware.txn2csv2parquet;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.livy.Job;
+import org.apache.livy.JobContext;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
+import org.apache.spark.sql.SparkSession;
+import org.postgresql.copy.CopyManager;
+import org.postgresql.core.BaseConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.util.UUID;
+
+public class ExportPgToParquet implements Job<String> {
+    private String firm;
+    private String engagement;
+    private static final Logger log = LoggerFactory.getLogger(ExportPgToParquet.class);
+
+    public ExportPgToParquet(String firm, String engagement) {
+        this.firm = firm;
+        this.engagement = engagement;
+    }
+
+    public String call(JobContext jobContext) throws Exception {
+        try {
+            SparkSession spark = SparkSession.builder().appName("ExportPgToParquetUsingLivy").getOrCreate();
+            Configuration configuration = new Configuration();
+            UUID randomGuid = UUID.randomUUID();
+            String tempFile = "/tmp/" + randomGuid + ".csv";
+            String jdbcUrl = "jdbc:postgresql://usd1-da-aurorapg-accounting-2.chrmptbiz3xx.us-east-1.rds.amazonaws.com/f-" + this.firm;
+            String sourceTable = "\"" + this.engagement + "\".transaction_line";
+            FileSystem fileSystem = FileSystem.get(configuration);
+            Path file = new Path(tempFile);
+            FSDataOutputStream fileOutputStream = fileSystem.create(file);
+            Connection connection = DriverManager.getConnection(jdbcUrl, "postgres", "wrlS1ejurOPr");
+            CopyManager copyManager = new CopyManager((BaseConnection) connection);
+            copyManager.copyOut("COPY " + sourceTable + " TO STDOUT WITH (FORMAT CSV, HEADER FALSE)", fileOutputStream);
+            fileOutputStream.close();
+            Dataset<Row> jdbcDF = spark.read().format("jdbc").option("driver", "org.postgresql.Driver").option("url", jdbcUrl).option("dbtable", "\"" + this.engagement + "\".transaction_line").option("user", "postgres").option("password", "wrlS1ejurOPr").load();
+            Dataset<Row> fileDS = spark.read().schema(jdbcDF.schema()).format("csv").load("hdfs://" + tempFile);
+            (new File(tempFile)).delete();
+            String outputTransactionFile = "s3a://demo-naresh/" + this.engagement + "/output.transaction_line.parquet";
+            fileDS.write().mode(SaveMode.Overwrite).option("header", "true").option("compression", "gzip").parquet(outputTransactionFile);
+            return "Custom Success: Data exported in parquet format";
+        } catch (Exception var16) {
+            log.error(var16.getMessage());
+            return "Custom Failure: Data failed to exported in parquet format" + var16.getMessage();
+        }
+    }
+}
